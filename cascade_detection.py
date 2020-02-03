@@ -2,7 +2,11 @@ import numpy as np
 import cv2
 
 class Detection():
+    #def __init__(self):
+    #    self.cap = cv2.VideoCapture(0)
+
     def detect_palette(self, image):
+        #ret, image = self.cap.read()
         paletten_cascade = cv2.CascadeClassifier('cascade_palette_front_48_16.xml')
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
@@ -14,13 +18,18 @@ class Detection():
             return ((x, y, w, h), image)
         return((-1, -1, -1, -1), image)
 
+    #def __del__(self):
+    #    self.cap.release()
+
 if __name__ == "__main__":
-    cap = cv2.VideoCapture(0)
     det = Detection()
-    while True:
-        ret, image = cap.read()
-        (x, y, w, h), frame = det.detect_palette(image)
-        cv2.imshow('Frame', frame) 
-        cv2.waitKey(0)
-    cap.release()
+    _, image = det.detect_palette()
+    det.__del__()
     cv2.destroyAllWindows()
+
+#if __name__ == "__main__":
+#    cap = cv2.VideoCapture(0)
+#    ret, image = cap.read()
+#    det = Detection()
+#    (x, y, w, h), image = det.detect_palette(image)
+#    cap.release()

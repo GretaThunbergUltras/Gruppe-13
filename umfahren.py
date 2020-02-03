@@ -15,13 +15,18 @@ def get_noise(pre_dest, dest):
     else: 
         return dest
 
-bot = Bot()
-print("Calibrating...")
-bot.calibrate()
+
+'''
+Problem mit Bot() und Kamera
+'''
+#bot = Bot()
+#print("Calibrating...")
+#bot.calibrate()
 
 #controller = Controller()
 #lt = LineTracking()
-det = Detection()
+
+cap = cv2.VideoCapture(0)
 
 '''
 Wahrscheinlich Probleme mit den zwei Bot Objekten, evtl. lenken etc. komplett in controller auslagern??
@@ -29,9 +34,6 @@ cv2 Bildanzeige gefixed;
 evtl. Bildanzeige in umfahren.py integrieren
 evtl. LineTracking anpassen oder neu schreiben, um Linie nach umfahren wieder zu finden...
 '''
-
-#print("Capturing Video")
-#cap = cv2.VideoCapture(-1)
 
 state = 1
 
@@ -43,6 +45,7 @@ try:
     result_list = []
     j = 0
     while True:
+            ret, image = cap.read()
             for i in range(2):
                 sonar_result = octosonar.read_cm(i)
                 time.sleep(0.001)
@@ -65,7 +68,6 @@ try:
 
             result_list = []
             time.sleep(0.1)
-            #ret, image = cap.read()
             width = 640
             height = 480
 
@@ -74,26 +76,28 @@ try:
                 if(dist_front > 40):
                     #val = lt.track_line()
                     #controller.controll(val)
-                    print("Following line")    
+                    print("Following line")
+                    bot.drive_steer(0)
+                    bot.drive_power(0.8)    
                 else:
                     print("Palette voraus")
                     bot.drive_forward(0)
                     state = 0
             elif(state == 1):
                 #Palette in Sicht
-                cap = cv2.VideoCapture(0)
-                _, image = cap.read()
-                cap.release()
-                #image = cv2.imread("test.jpg")
-                (x, y, w, h), result = det.detect_palette(image)
+                det = Detection()
+                (x, y, w, h),_ = det.detect_palette(image)
+                #det.__del__()
+                #cv2.destroyAllWindows()
                 if(x == -1):
-                    (x, y, w, h) = (10, 0, 0, 0)
-                if(x > int(width / 2)):
+                    (x, y, w, h) = (400, 0, 0, 0)
+                if(x < int(width / 2)):
                     print("Palette weiter rechts -> Links umfahren")
-                    state = 2
+                    #controller.drive_forward(-30)
+                    state = 1
                 else:
                     print("Palette weiter links -> Rechts umfahren")
-                    state = 3
+                    state = 1
             elif(state == 2):
                 bot.drive_steer(-0.8)
                 if(dist < 40):
@@ -114,8 +118,11 @@ try:
                     print("Linker Sensor an Palette vorbei")
                     state = 4
             elif(state == 4):
-                bot.drive_steer(-0.8)
-                bot.drive_power(-30)
+                if(lt.track_line(image) == -1):
+                    bot.drive_steer(-0.8)
+                    bot.drive_power(-30)
+                else:
+                    bot.drive_power(0)
 
             #cv2.imshow("Feed", image)
 except KeyboardInterrupt:
