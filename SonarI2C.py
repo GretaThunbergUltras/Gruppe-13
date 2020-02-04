@@ -146,7 +146,7 @@ if __name__ == "__main__":
         octosonar = SonarI2C(pi, int_gpio=25)
         result_list = []
         while True:
-            for i in range(1):
+            for i in range(2):
                 sonar_result = octosonar.read_cm(i)
                 time.sleep(0.001)
                 if sonar_result is False:

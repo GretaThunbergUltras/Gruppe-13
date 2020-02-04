@@ -10,6 +10,7 @@ from LineTracking import LineTracking
 drive_motor = Motor(Motor._bp.PORT_B)
 steer_motor = CalibratedMotor(Motor._bp.PORT_D, calpow=20)
 
+###Funktion zum Filtern von falschen Sensorwerten
 def get_noise(pre_dest, dest):
     delta = dest - pre_dest
     if(abs(delta) > 10 and pre_dest > dest):
@@ -29,8 +30,11 @@ def stop_all():
     steer_motor.stop()
 
 def main():
+    ###Kameraaufnahme starten
     cap = cv2.VideoCapture(0)
+    ###Detectionobjekt für Palettenerkennung
     det = Detection()
+    ###Linetracking und controller objekt für Linetracking
     lt = LineTracking()
     controller = Controller()
 
@@ -55,31 +59,32 @@ def main():
                 else:
                     result_list.append(round(sonar_result, 1))
                 
+            ###Ersten wert des Sensors ignorieren, da dieser meist falsch ist
             if(j == 0):
-                dist_front = 50
-                dist_side = 50
+                dist_front_l = 50
+                dist_front_r = 50
                 j += 1
             elif(j == 1):
-                dist_front = result_list[1]
-                dist_side = result_list[0]
+                dist_front_l = result_list[1]
+                dist_front_r = result_list[0]
                 j += 1
             else:
-                dist_front = get_noise(dist_front, result_list[1])
-                dist_side = get_noise(dist_side, result_list[0])
+                ###Ab dem drittem Wert werden die Werte auf Ausschläge bereinigt
+                dist_front_l = get_noise(dist_front_l, result_list[1])
+                dist_front_r = get_noise(dist_front_r, result_list[0])
             
             result_list = []
             width = 640
             height = 480
 
             if(state == 0):
-                if(dist_front > 40):
-                    print("Following line! Entfernung vorne: {}".format(dist_front))
-                    ############TODO: adding line following##########
+                print("Following line! Entfernung vorne: {}".format(dist_front))
+                if(dist_front_l > 40 or dist_front_r > 40):
+                    ###Linie folgen
+                    drive_steer(0)
                     drive_power(-30)
-                    #drive_steer(0)
                     val = lt.track_line(image, False)
                     pid = controller.pid(val)
-                    #print(pid)
                     drive_steer(pid/100)
                 else:
                     drive_power(0)
@@ -87,10 +92,11 @@ def main():
             elif(state == 1):
                 print("Object in front!")
                 det = Detection()
+                ###Aktuelles Bild an det übergeben -> Palette erkennen
                 (x, y, w, h), image = det.detect_palette(image)
-                x=-1
+                ###Wenn detect_palette(image) -1 zurückgibt, wurde keine Palette erkannt
                 if(x == -1):
-                    #Choose value that's on the right side -> when nothing is detected drive around the right side
+                    ###Wenn keine Palette erkannt wurde -> x-Wert so setzen, dass er rechts vorbei fährt
                     x = 1000
                 if(x < int(width / 2)):
                     print("Pallet more on the right side -> drive around the left")
@@ -99,39 +105,45 @@ def main():
                     print("Pallet more on the left side -> drive around the right")
                     state = 3
             elif(state == 2):
-                print("Entfernung vorne: {}".format(dist_front))
+                ###Solange nach vorne links fahren, bis rechter Sensor über die Palette hinaus ist, dann noch etwas weiter fahren
+                print("Entfernung vorne rechts: {}".format(dist_front_r))
                 print("Drive around left!")
-                if(dist_front > 80):
+                if(dist_front_r > 80):
                     print("Right sensor past the pallet!")
-                    ############TODO: Value tuning!##################
                     drive_steer(-0.8)
                     drive_power(-30)
-                    time.sleep(1)
+                    time.sleep(0.5)
                     drive_power(0)
                     state = 5
                 else:
                     drive_steer(-0.8)
                     drive_power(-30)
             elif(state == 3):
+                ###Solange nach vorne recht fahren, bis linker Sensor über die Palette hinaus ist, dann noch etwas weiter fahren
                 print("Drive around right!")
-                if(dist_front > 80):
+                if(dist_front_l > 80):
                     print("Left sensor past the pallet!")
-                    ############TODO: Value tuning!##################
-                    #drive_steer(0.8)
-                    #drive_power(-30)
-                    #time.sleep(1)
+                    drive_steer(0.8)
+                    drive_power(-30)
+                    time.sleep(0.5)
                     drive_power(0)
                     state = 5
                 else:
                     drive_steer(0.8)
                     drive_power(-30)
             elif(state == 4):
+                ###track_line(image) gibt solange -1 zurück, bis eine Linie erkannt wurde
                 print("Trying to return on line!")
-                if(lt.track_line(image, True) == -1):
+                val = lt.track_line(image, True)
+                print(val)
+                if(val == -1):
                     drive_steer(1)
                     drive_power(-30)
                 else:
+                    drive_steer(-0.8)
+                    time.sleep(1.2)
                     drive_power(0)
+                    state = 0
             elif(state == 5):
                 print("Trying to return on line!")
                 ############TODO: General testing!##################
@@ -145,15 +157,13 @@ def main():
                     time.sleep(1.2)
                     drive_power(0)
                     state = 0
-                
-
-
-#-----------Show image TODO: Check if waitKey and the Interrupt work together-------------------------------------------------#
+            ###Aktuelles  Bild anzeigen
             cv2.imshow("frame", image)
             cv2.waitKey(1)
     except KeyboardInterrupt:
         print("\nCTRL-C pressed. Cleaning up and exiting!")
     finally:
+        ###Alles sicher beenden
         octosonar.cancel()
         cap.release()
         cv2.destroyAllWindows()
