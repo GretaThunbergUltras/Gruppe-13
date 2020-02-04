@@ -88,7 +88,7 @@ void initialize()
    gpioSetAlertFunc(25, ISR); // Init ISR.
    handle = wiringPiI2CSetup(ADDRESS);
 
-   printf("inti");
+   printf("init");
 }
 
 int main(int argc, char *argv[])
